@@ -69,6 +69,19 @@ public class FileReaderWriter {
 		return list;
 	}
 	
+	public static ArrayList<Double> getMaxMinFeatures(String fileName) {
+		ArrayList<Double> list = new ArrayList<>();
+		ArrayList<String> lines = readFromFile(fileName);
+		
+		for(String line : lines) {
+			String[] words = line.split(", ");
+			for(String word : words)
+				list.add(Double.parseDouble(word));
+		}
+		
+		return list;
+	}
+	
 	public static void writeToFile(String fileName, ArrayList<String> outputs) {
 		BufferedWriter bw = null;
 		
@@ -81,7 +94,7 @@ public class FileReaderWriter {
            bw = new BufferedWriter(new FileWriter(file.getAbsoluteFile()));
            
            for(String output : outputs)
-        	   bw.write(output);
+        	   bw.write(output + "\n");
            
          } catch(Exception e){
              System.err.println(e);
@@ -112,7 +125,7 @@ public class FileReaderWriter {
 		ArrayList<String> outputs = new ArrayList<>();
 		String output = "";
 		for(double val : normalizerFeatures)
-			output += String.valueOf(val) + "\t";
+			output += String.valueOf(val) + ", ";
 		outputs.add(output);
 		
 		writeToFile(fileName, outputs);

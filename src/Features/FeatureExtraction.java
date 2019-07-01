@@ -2,6 +2,7 @@ package Features;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 import Helper.Constants;
 import Model.SensorList;
@@ -19,6 +20,97 @@ public class FeatureExtraction {
 	
 	public ArrayList<double[]> getFeatures() {
 		return this.featureList;
+	}
+
+	
+	
+	/*
+	 * Feature extraction
+	 * */
+	
+	public void extractFeatures(SensorList sensorList, ArrayList<Integer> heelStrikePeaks){
+		ArrayList<Integer> nonHeelStrikePeaks = extractPeaks(sensorList);
+		extractFeatureList(sensorList, nonHeelStrikePeaks, Constants.NON_HEEL_STRIKE_CLASS);
+		extractFeatureList(sensorList, heelStrikePeaks, Constants.HEEL_STRIKE_CLASS);
+	}	
+	
+	private void extractFeatureList(SensorList sensorList, ArrayList<Integer> indexList, int output) {
+		for(int i=0; i<indexList.size()-1; i++) {
+			int start = indexList.get(i);
+			int end = indexList.get(i+1);
+			double[] feature = extractFeature(sensorList, start, end, output);
+			featureList.add(feature);
+		}
+	}
+	
+	private double[] extractFeature(SensorList sensorList, int start, int end, int output) {
+		double[] accelFeatures = extractSensorFeature(sensorList, Constants.ACCEL, start, end);
+		double[] gyroFeatures = extractSensorFeature(sensorList, Constants.GYRO, start, end);
+		double[] compassFeatures = extractSensorFeature(sensorList, Constants.COMPASS, start, end);
+		
+		double[] feature = concat(accelFeatures, gyroFeatures, compassFeatures);
+		double[] outputs = extractOutput(output);
+		
+		return concat(feature, outputs);
+	}
+	
+	public double[] extractFeature(SensorList sensorList, int start, int end) {
+		double[] accelFeatures = extractSensorFeature(sensorList, Constants.ACCEL, start, end);
+		double[] gyroFeatures = extractSensorFeature(sensorList, Constants.GYRO, start, end);
+		double[] compassFeatures = extractSensorFeature(sensorList, Constants.COMPASS, start, end);
+		
+		return concat(accelFeatures, gyroFeatures, compassFeatures);
+	}
+	
+	
+	private double[] extractOutput(int output) {
+		double[] outputs = new double[Constants.NUM_CLASSES];
+		outputs[output] = 1;
+		return outputs;
+	}
+	
+	private double[] extractSensorFeature(SensorList sensorList, int sensorType, int start, int end) {
+		double[] xAxisFeatures = extractAxisFeature(sensorList, sensorType, Constants.AXIS_X, start, end);
+		double[] yAxisFeatures = extractAxisFeature(sensorList, sensorType, Constants.AXIS_Y, start, end);
+		double[] zAxisFeatures = extractAxisFeature(sensorList, sensorType, Constants.AXIS_Z, start, end);
+		
+		return concat(xAxisFeatures, yAxisFeatures, zAxisFeatures);
+	}
+	
+	private double[] extractAxisFeature(SensorList sensorList, int sensorType, int axis, int start, int end) {
+		ArrayList<SensorPackage> sensors = sensorList.getSensorList();
+		
+		double mean = mean(sensors, sensorType, axis, start, end);
+		double max = max(sensors, sensorType, axis, start, end);
+		double min = min(sensors, sensorType, axis, start, end);
+		double median = median(sensors, sensorType, axis, start, end);
+		double range = range(sensors, sensorType, axis, start, end);
+		double variance = variance(sensors, sensorType, axis, start, end);
+		double std = standardDerivation(sensors, sensorType, axis, start, end);
+		
+		double[] diffList = diff(sensors, sensorType, axis, start, end);
+		double meanDiff = mean(diffList);
+        double rangeDiff = range(diffList);
+        double varianceDiff = variance(diffList);
+        double stdDiff = standardDerivation(diffList);
+        double medianDiff = median(diffList);
+
+        double peakToPeak = max - min;
+        double thres1 = min + peakToPeak * 0.3f;
+        double thres2 = min + peakToPeak * 0.5f;
+        double thres3 = min + peakToPeak * 0.7f;
+        double meanThres1 = mean(sensors, sensorType, axis, start, end, thres1);
+        double meanThres2 = mean(sensors, sensorType, axis, start, end, thres2);
+        double meanThres3 = mean(sensors, sensorType, axis, start, end, thres3);
+
+        double timestamp = diffTimestamp(sensors, start, end);
+		
+        return new double[] {
+                mean, max, min, median, range, variance, std,
+                meanDiff, medianDiff, rangeDiff, varianceDiff, stdDiff,
+                peakToPeak, meanThres1, meanThres2, meanThres3,
+                timestamp
+        };
 	}
 	
 	
@@ -63,87 +155,12 @@ public class FeatureExtraction {
 	}
 	
 	
-	
 	/*
-	 * Feature extraction
+	 * Shuffle
 	 * */
-	
-	public void extractFeatures(SensorList sensorList, ArrayList<Integer> heelStrikePeaks){
-		ArrayList<Integer> nonHeelStrikePeaks = extractPeaks(sensorList);
-		extractFeatureList(sensorList, nonHeelStrikePeaks, Constants.NON_HEEL_STRIKE_CLASS);
-		extractFeatureList(sensorList, heelStrikePeaks, Constants.HEEL_STRIKE_CLASS);
+	public void shuffle() {
+		Collections.shuffle(featureList);
 	}
-	
-	private void extractFeatureList(SensorList sensorList, ArrayList<Integer> indexList, int output) {
-		for(int i=0; i<indexList.size(); i++) {
-			int start = indexList.get(i);
-			int end = indexList.get(i+1);
-			double[] feature = extractFeature(sensorList, start, end, output);
-			featureList.add(feature);
-		}
-	}
-	
-	private double[] extractFeature(SensorList sensorList, int start, int end, int output) {
-		double[] accelFeatures = extractSensorFeature(sensorList, Constants.ACCEL, start, end);
-		double[] gyroFeatures = extractSensorFeature(sensorList, Constants.GYRO, start, end);
-		double[] compassFeatures = extractSensorFeature(sensorList, Constants.COMPASS, start, end);
-		
-		double[] feature = concat(accelFeatures, gyroFeatures, compassFeatures);
-		double[] outputs = extractOutput(output);
-		
-		return concat(feature, outputs);
-	}
-	
-	private double[] extractOutput(int output) {
-		double[] outputs = new double[Constants.NUM_CLASSES];
-		outputs[output] = 1;
-		return outputs;
-	}
-	
-	private double[] extractSensorFeature(SensorList sensorList, int sensorType, int start, int end) {
-		double[] xAxisFeatures = extractAxisFeature(sensorList, sensorType, Constants.AXIS_X, start, end);
-		double[] yAxisFeatures = extractAxisFeature(sensorList, sensorType, Constants.AXIS_Y, start, end);
-		double[] zAxisFeatures = extractAxisFeature(sensorList, sensorType, Constants.AXIS_Z, start, end);
-		
-		return concat(xAxisFeatures, yAxisFeatures, zAxisFeatures);
-	}
-	
-	private double[] extractAxisFeature(SensorList sensorList, int sensorType, int axis, int start, int end) {
-		ArrayList<SensorPackage> sensors = sensorList.getSensorList();
-		
-		double mean = mean(sensors, sensorType, axis, start, end);
-		double max = max(sensors, sensorType, axis, start, end);
-		double min = min(sensors, sensorType, axis, start, end);
-		double median = median(sensors, sensorType, axis, start, end);
-		double range = range(sensors, sensorType, axis, start, end);
-		double variance = variance(sensors, sensorType, axis, start, end);
-		double std = standardDerivation(sensors, sensorType, axis, start, end);
-		
-		double[] diffList = diff(sensors, sensorType, axis, start, end);
-		double meanDiff = mean(diffList);
-        double medianDiff = median(diffList);
-        double rangeDiff = range(diffList);
-        double varianceDiff = variance(diffList);
-        double stdDiff = standardDerivation(diffList);
-
-        double peakToPeak = max - min;
-        double thres1 = min + peakToPeak * 0.3f;
-        double thres2 = min + peakToPeak * 0.5f;
-        double thres3 = min + peakToPeak * 0.7f;
-        double meanThres1 = mean(sensors, sensorType, axis, start, end, thres1);
-        double meanThres2 = mean(sensors, sensorType, axis, start, end, thres2);
-        double meanThres3 = mean(sensors, sensorType, axis, start, end, thres3);
-
-        double timestamp = diffTimestamp(sensors, start, end);
-		
-        return new double[] {
-                mean, max, min, median, range, variance, std,
-                meanDiff, medianDiff, rangeDiff, varianceDiff, stdDiff,
-                peakToPeak, meanThres1, meanThres2, meanThres3,
-                timestamp
-        };
-	}
-	
 	
 	/*
 	 * Feature extraction helper method
@@ -291,10 +308,11 @@ public class FeatureExtraction {
 
     private double[] diff(ArrayList<SensorPackage> sensors, int sensorType, int axis, int start, int end) {
         double[] diffList = new double[(end-start+1)];
-        for(int index = start; index<end; index++) {
-            double value = sensors.get(index+1).getSensorData(sensorType, axis);
-            double prevValue = sensors.get(index).getSensorData(sensorType, axis);
-            diffList[index] = value - prevValue;
+        int index = 0;
+        for(int i = start; i<end; i++) {
+            double value = sensors.get(i+1).getSensorData(sensorType, axis);
+            double prevValue = sensors.get(i).getSensorData(sensorType, axis);
+            diffList[index++] = value - prevValue;
         }
 
         return diffList;
@@ -325,7 +343,7 @@ public class FeatureExtraction {
 			double accelY = sampleVal.getSensorData(Constants.ACCEL, Constants.AXIS_Y);
 			double accelY1 = sensorPackage.getSensorData(Constants.ACCEL, Constants.AXIS_Y);
 			
-			if(Math.abs(accelY - accelY1) <= Constants.ACCEL_THRESHOLD) {
+			if(Math.abs(accelY - accelY1) >= Constants.ACCEL_THRESHOLD) {
 				filterList.add(i);
 				sampleVal = sensorPackage;
 			}
